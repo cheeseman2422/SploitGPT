@@ -1,0 +1,56 @@
+services:
+  sploitgpt:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sploitgpt
+    hostname: sploitgpt
+    stdin_open: true
+    tty: true
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+      - SYS_PTRACE
+    security_opt:
+      - seccomp:unconfined
+      - apparmor:unconfined
+      - no-new-privileges:false
+    environment:
+      - OLLAMA_HOST=${OLLAMA_HOST:-http://host.docker.internal:11434}
+      - SPLOITGPT_MODEL=${SPLOITGPT_MODEL:-qwen2.5:32b}
+      - TERM=xterm-256color
+    volumes:
+      - ./loot:/app/loot
+      - ./sessions:/app/sessions
+      - ./data:/app/data
+    networks:
+      - sploitnet
+    # Use host network for full access to target networks
+    # Uncomment the line below and comment out 'networks' for host networking
+    # network_mode: host
+
+  # Optional: Run Ollama in the same compose (requires NVIDIA GPU)
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   container_name: ollama
+  #   volumes:
+  #     - ollama_data:/root/.ollama
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - driver: nvidia
+  #             count: 1
+  #             capabilities: [gpu]
+  #   ports:
+  #     - "11434:11434"
+  #   networks:
+  #     - sploitnet
+
+networks:
+  sploitnet:
+    driver: bridge
+
+volumes:
+  ollama_data:
