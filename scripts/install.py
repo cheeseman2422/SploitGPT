@@ -37,6 +37,20 @@ except ImportError:
 console = Console()
 
 
+def is_in_container() -> bool:
+    """Detect if we're running inside a container."""
+    # Check for Docker
+    if Path("/.dockerenv").exists():
+        return True
+    # Check for container cgroup
+    try:
+        with open("/proc/1/cgroup", "r") as f:
+            return "docker" in f.read() or "lxc" in f.read()
+    except:
+        pass
+    return False
+
+
 BANNER = """
 [bold red]
  ███████╗██████╗ ██╗      ██████╗ ██╗████████╗ ██████╗ ██████╗ ████████╗
@@ -287,6 +301,12 @@ async def main():
     console.print(Panel(BANNER, border_style="red"))
     console.print("\n[bold]Welcome to SploitGPT Installation![/bold]\n")
     
+    # Check if running in container
+    if is_in_container():
+        console.print("[yellow]⚠ Running inside a container[/yellow]")
+        console.print("[dim]GPU operations (Ollama, fine-tuning) should be run on the host machine.[/dim]")
+        console.print("[dim]This script will set up the container to connect to Ollama on the host.[/dim]\n")
+    
     # Check GPU
     console.print("[cyan]Checking system...[/cyan]")
     gpu_info = check_gpu()
@@ -296,7 +316,10 @@ async def main():
     elif gpu_info["has_amd"]:
         console.print("[green]✓ AMD GPU detected (ROCm)[/green]")
     else:
-        console.print("[yellow]⚠ No GPU detected, will use CPU (slower)[/yellow]")
+        if is_in_container():
+            console.print("[dim]No GPU visible (expected in container - GPU is on host)[/dim]")
+        else:
+            console.print("[yellow]⚠ No GPU detected, will use CPU (slower)[/yellow]")
     
     console.print(f"[dim]Recommended model: {gpu_info['recommended_model']}[/dim]")
     
@@ -346,10 +369,17 @@ async def main():
     if Confirm.ask("\n[cyan]Build training data from security sources?[/cyan]", default=True):
         await build_training_data()
     
-    # Fine-tuning (optional)
+    # Fine-tuning (optional) - only on host with GPU
     final_model = model
-    if Confirm.ask("\n[cyan]Run install-time fine-tuning?[/cyan] (recommended, ~30 min)", default=True):
-        final_model = await run_finetuning(model)
+    if is_in_container():
+        console.print("\n[yellow]⚠ Fine-tuning skipped (run on GPU host, not in container)[/yellow]")
+        console.print("[dim]To fine-tune, run this script directly on your host machine with the GPU.[/dim]")
+    elif gpu_info["has_nvidia"] and gpu_info["vram_gb"] >= 16:
+        if Confirm.ask("\n[cyan]Run install-time fine-tuning?[/cyan] (recommended, ~30 min)", default=True):
+            final_model = await run_finetuning(model)
+    else:
+        console.print("\n[yellow]⚠ Fine-tuning requires 16GB+ VRAM[/yellow]")
+        console.print("[dim]Using base model. You can fine-tune later with more GPU memory.[/dim]")
     
     # Build Docker image
     if check_docker():
