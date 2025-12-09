@@ -74,3 +74,24 @@ async def nmap_scan(target: str, ports: str = "-", options: str = "-sV") -> str:
     output_base = f"/app/loot/nmap_{target.replace('/', '_').replace('.', '_')}"
     cmd = f"nmap {options} -p {ports} {target} -oA {output_base}"
     return await terminal(cmd, timeout=600)
+
+
+# Import submodules
+from .wordlists import (
+    get_wordlist,
+    get_wordlists_for_task,
+    suggest_wordlist,
+    format_wordlist_suggestions,
+)
+from .payloads import (
+    generate_reverse_shells,
+    format_reverse_shells_for_agent,
+    php_web_shell,
+    jsp_web_shell,
+)
+from .commands import (
+    get_command,
+    search_commands,
+    format_commands_for_agent,
+    ALL_COMMANDS,
+)
